@@ -1,0 +1,13 @@
+[package]
+name = "aoc2022"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow      = "1.0.67"
+regex       = "1.7"
+rayon       = "1.6.1"
+fnv         = "1.0.7"
+
+[profile.release]
+debug=true
