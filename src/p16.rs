@@ -74,7 +74,7 @@ fn all_pairs(input: &[Valve]) -> Vec<Vec<usize>> {
 }
 
 /// Compute the maximum flow achievable by visiting the given subset of all nodes
-fn max_for_subset(input: &Input, apsp: &[Vec<usize>], subset: u64, t_max: usize) -> Result<usize> {
+fn max_for_subset(input: &Input, apsp: &[Vec<usize>], subset: u64, t_max: usize) -> Result<(usize, usize)> {
     #[derive(Copy, Clone)]
     struct Partial {
         /// Set of untouched valves
@@ -104,8 +104,18 @@ fn max_for_subset(input: &Input, apsp: &[Vec<usize>], subset: u64, t_max: usize)
             self.score
         }
 
-        fn upper_bound(&self) -> usize {
-            (self.cum_flow * (self.t - 1)) + self.score
+        fn upper_bound(&self, paths: &[Vec<usize>], valves: &[Valve]) -> usize {
+            let mut s = self.score;
+            let mut bits = self.avail;
+            let paths = &paths[self.pos];
+            for i in 0..(64-bits.leading_zeros()) as usize {
+                if bits & 1 != 0 {
+                    s += self.t.saturating_sub(paths[i] + 1) * valves[i].flow;
+                }
+                bits >>= 1;
+            }
+
+            s
         }
 
         fn branch<'p>(
@@ -130,7 +140,6 @@ fn max_for_subset(input: &Input, apsp: &[Vec<usize>], subset: u64, t_max: usize)
         }
     }
 
-    // preprocess to remove irrelevant valves
     let valves = &input.1;
     let all_paths = apsp;
 
@@ -144,19 +153,20 @@ fn max_for_subset(input: &Input, apsp: &[Vec<usize>], subset: u64, t_max: usize)
     });
 
     let mut best_lower = 0;
+    let mut considered = 0;
     while let Some(state) = if paths.len() < 1_000_000_000 { paths.pop_front() }
                             else { paths.pop_back() } {
         if state.lower_bound(valves) > best_lower {
             best_lower = state.lower_bound(valves);
-            paths.retain(|st| st.upper_bound() > best_lower);
+            paths.retain(|st| st.upper_bound(all_paths, valves) > best_lower);
         }
+        considered += 1;
 
-        // commit considered buffer into queue
         paths.extend(state.branch(all_paths, valves)
-                          .filter(|st| st.upper_bound() > best_lower));
+                          .filter(|st| st.upper_bound(all_paths, valves) > best_lower));
     }
 
-    Ok(best_lower)
+    Ok((best_lower, considered))
 }
 
 fn solve1(input: &Input) -> Result<usize> {
@@ -168,7 +178,9 @@ fn solve1(input: &Input) -> Result<usize> {
     }
 
     let apsp = all_pairs(valves);
-    max_for_subset(input, &apsp, flow_mask, 30)
+    let (best, _states) = max_for_subset(input, &apsp, flow_mask, 30)?;
+    //println!("{}", states);
+    Ok(best)
 }
 
 fn solve2(input: &Input) -> Result<usize> {
@@ -190,24 +202,29 @@ fn solve2(input: &Input) -> Result<usize> {
         flow_mask |= 1 << i;
     }
 
-    Ok((0..n_max).into_par_iter()
-                 .map(|mut mask| {
-                     // we take items with 1 bits, they take items with 0 bits
-                     let mut us = 0;
-                     for v in relevant_valves.iter().cloned() {
-                         if mask & 1 == 1 {
-                             us |= 1 << v;
-                         }
-                         mask >>= 1;
+    let states = std::sync::atomic::AtomicUsize::new(0);
+    let res = (0..n_max).into_par_iter()
+             .map(|mut mask| {
+                 // we take items with 1 bits, they take items with 0 bits
+                 let mut us = 0;
+                 for v in relevant_valves.iter().cloned() {
+                     if mask & 1 == 1 {
+                         us |= 1 << v;
                      }
-                     let them = flow_mask ^ us;
+                     mask >>= 1;
+                 }
+                 let them = flow_mask ^ us;
 
-                     let us_score = max_for_subset(input, &apsp, us, 26).unwrap();
-                     let them_score = max_for_subset(input, &apsp, them, 26).unwrap();
+                 let (us_score, us_st) = max_for_subset(input, &apsp, us, 26).unwrap();
+                 let (them_score, them_st) = max_for_subset(input, &apsp, them, 26).unwrap();
+                 states.fetch_add(us_st, std::sync::atomic::Ordering::Relaxed);
+                 states.fetch_add(them_st, std::sync::atomic::Ordering::Relaxed);
 
-                     us_score + them_score
-                 })
-                 .max().unwrap())
+                 us_score + them_score
+             })
+             .max().unwrap();
+    //println!("{}", states.into_inner());
+    Ok(res)
 }
 
 problem!(load_input => (usize, Vec<Valve>) => (solve1, solve2));
