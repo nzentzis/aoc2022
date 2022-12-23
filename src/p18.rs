@@ -32,7 +32,7 @@ fn solve1(input: &Input) -> Result<usize> {
 }
 
 fn solve2(input: &Input) -> Result<usize> {
-    let bound = (input.iter().cloned().flat_map(|p| p.0).max().unwrap() + 1) as isize;
+    let bound = input.iter().cloned().flat_map(|p| p.0).max().unwrap() + 1;
 
     // volume in the cube where all coords are between -1 and bound (inclusive)
     //
@@ -46,20 +46,23 @@ fn solve2(input: &Input) -> Result<usize> {
         air.insert(p);
 
         for delta in [-1isize, 1isize] {
-            if !data.contains(&Point([x+delta, y, z])) && range.contains(&(x+delta)) {
-                if !air.contains(&[x+delta, y, z]) {
-                    points.push([x+delta, y, z]);
-                }
+            if !data.contains(&Point([x+delta, y, z])) &&
+                range.contains(&(x+delta)) &&
+                !air.contains(&[x+delta, y, z])
+            {
+                points.push([x+delta, y, z]);
             }
-            if !data.contains(&Point([x, y+delta, z])) && range.contains(&(y+delta)) {
-                if !air.contains(&[x, y+delta, z]) {
-                    points.push([x, y+delta, z]);
-                }
+            if !data.contains(&Point([x, y+delta, z])) &&
+                range.contains(&(y+delta)) &&
+                !air.contains(&[x, y+delta, z])
+            {
+                points.push([x, y+delta, z]);
             }
-            if !data.contains(&Point([x, y, z+delta])) && range.contains(&(z+delta)) {
-                if !air.contains(&[x, y, z+delta]) {
-                    points.push([x, y, z+delta]);
-                }
+            if !data.contains(&Point([x, y, z+delta])) &&
+                range.contains(&(z+delta)) &&
+                !air.contains(&[x, y, z+delta])
+            {
+                points.push([x, y, z+delta]);
             }
         }
     }

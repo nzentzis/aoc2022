@@ -48,48 +48,41 @@ impl<T> ShiftList<T> {
     }
 
     fn shift_node(&mut self, idx: usize, delta: isize) {
+        if delta == 0 { return; }
+
         unsafe {
             let node = self.nodes[idx];
 
-            if delta > 0 {
-                // remove ourselves from the linking structure
-                let mut prev = (*self.nodes[idx]).prev;
-                let next = (*self.nodes[idx]).next;
+            // remove ourselves from the linking structure
+            let mut prev = (*self.nodes[idx]).prev;
+            let mut next = (*self.nodes[idx]).next;
 
-                (*prev).next = next;
-                (*next).prev = prev;
+            (*prev).next = next;
+            (*next).prev = prev;
 
-                // advance N times forwards
-                for _ in 0..delta {
-                    prev = (*prev).next;
+            match delta.cmp(&0) {
+                std::cmp::Ordering::Greater => {
+                    // advance N times forwards
+                    for _ in 0..delta {
+                        prev = (*prev).next;
+                    }
+                    next = (*prev).next;
                 }
-
-                // re-insert
-                let next = (*prev).next;
-                (*prev).next = node;
-                (*next).prev = node;
-                (*node).next = next;
-                (*node).prev = prev;
-            } else if delta < 0 {
-                // remove ourselves from the linking structure
-                let prev = (*self.nodes[idx]).prev;
-                let mut next = (*self.nodes[idx]).next;
-
-                (*prev).next = next;
-                (*next).prev = prev;
-
-                // advance N times backwards
-                for _ in 0..(-delta) {
-                    next = (*next).prev;
+                std::cmp::Ordering::Less => {
+                    // advance N times backwards
+                    for _ in 0..(-delta) {
+                        next = (*next).prev;
+                    }
+                    prev = (*next).prev;
                 }
-
-                // re-insert
-                let prev = (*next).prev;
-                (*prev).next = node;
-                (*next).prev = node;
-                (*node).next = next;
-                (*node).prev = prev;
+                std::cmp::Ordering::Equal => unreachable!()
             }
+
+            // re-insert
+            (*prev).next = node;
+            (*next).prev = node;
+            (*node).next = next;
+            (*node).prev = prev;
         }
     }
 
@@ -124,10 +117,14 @@ fn mix_sequence(seq: &[i64], k: usize) -> Vec<i64> {
     for _ in 0..k {
         for i in 0..n {
             let mut delta = *seq.get_node(i);
-            if delta > 0 {
-                delta = delta % (n as i64 - 1);
-            } else if delta < 0 {
-                delta = -((-delta) % (n as i64 - 1));
+            match delta.cmp(&0) {
+                std::cmp::Ordering::Equal => {}
+                std::cmp::Ordering::Less => {
+                    delta = -((-delta) % (n as i64 - 1));
+                }
+                std::cmp::Ordering::Greater => {
+                    delta %= n as i64 - 1;
+                }
             }
             seq.shift_node(i, delta as isize);
         }

@@ -34,12 +34,34 @@ struct Blueprint {
 
 /// Compute quality score for the given blueprint
 fn max_geodes(bp: &Blueprint, t_max: usize) -> usize {
+    /// Simulation state type
+    ///
+    /// Sim states are represented as bit-packed 64-bit integers, where the fields are as follows:
+    ///
+    /// ```text
+    ///                   [       robot counts       |      resource counts     ]
+    /// [ unused |  time  |ore_bots|cly_bots|obs_bots|   ore  |  clay  | obsid  ]
+    /// 64       56       48       40       32       24       16       8        0
+    /// ```
+    ///
+    /// If we assume that the values will never overflow or underflow, this representation has
+    /// several nice properties:
+    ///
+    ///  * Any set of item additions can be completed in a single CPU instruction: just OR the
+    ///    shifted versions of the items together, and add the result to the state word. Similarly
+    ///    with item removals - just OR the counts to remove and subtract the result.
+    ///  * A version of the state advanced by one timestep can be easily constructed. Since the
+    ///    robot counts are stored in the same order as the resource counts, we can add all robot
+    ///    counts to their corresponding resource at once by shifting, masking, and adding.
+    ///  * The fact that the state is a single 64-bit word drastically speeds up hashing for the
+    ///    purposes of storing it in the memoization hashmap.
     #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
     #[repr(transparent)]
     struct State {
         key: u64,
     }
 
+    #[allow(clippy::unusual_byte_groupings)] // they're grouped semantically
     impl State {
         const BOTS_MASK: u64 = 0x00_ffffff_000000;
         const TIME_MASK: u64 = 0xff_000000_000000;
@@ -64,7 +86,6 @@ fn max_geodes(bp: &Blueprint, t_max: usize) -> usize {
             let k0 = self.key;
             let k1 = k0 + ((k0 & Self::BOTS_MASK) >> 24);
             let k2 = k1 - Self::TIMESTEP;
-            //println!("{:08x} {:08x} {:08x}", k0, k1, k2);
 
             Self { key: k2 }
         }
@@ -110,7 +131,7 @@ fn max_geodes(bp: &Blueprint, t_max: usize) -> usize {
                 g_ore:  (bp.g_cost.0 as u32) << 16,
 
                 o_clay: (bp.o_cost.1 as u32) << 8,
-                g_obs:  (bp.g_cost.1 as u32) << 0,
+                g_obs:   bp.g_cost.1 as u32,
 
                 max_ore: (bp.b_cost.max(bp.c_cost).max(bp.o_cost.0).max(bp.g_cost.0) as u64) << 40,
                 max_clay: (bp.o_cost.1 as u64) << 32,
@@ -188,10 +209,7 @@ fn max_geodes(bp: &Blueprint, t_max: usize) -> usize {
 
     let costs = Costs::new(bp);
     let mut store = fnv::FnvHashMap::default();
-    let out = f(&costs, &mut store, State {
-        key: (t_max as u64 * State::TIMESTEP) | State::ORE_BOT
-    });
-    out
+    f(&costs, &mut store, State { key: (t_max as u64 * State::TIMESTEP) | State::ORE_BOT })
 }
 
 fn solve1(input: &Input) -> Result<usize> {
