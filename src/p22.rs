@@ -596,7 +596,7 @@ impl CubeMapping {
 
         // Find which edge of the face
         let is_horiz = matches!(dir, Dir::Up | Dir::Down);
-        let (v0, v1, c0, c1) = {
+        let (v0, v1, c0, _c1) = {
             let (i0, i1) = if is_horiz {
                 // find the two verts which match the position Y
                 let mut f_idxs = self.faces[face].coords.iter().enumerate()
