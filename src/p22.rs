@@ -633,7 +633,7 @@ impl CubeMapping {
             let c_j1 = self.faces[opp_face].coords[j1];
 
             // used for finding the direction
-            let j2 = (0..4).into_iter().filter(|x| *x != j0 && *x != j1).next().unwrap();
+            let j2 = (0..4).into_iter().find(|x| *x != j0 && *x != j1).unwrap();
             let c_j2 = self.faces[opp_face].coords[j2];
             let edge_horiz = c_j0.1 == c_j1.1;
 

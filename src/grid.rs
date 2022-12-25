@@ -274,7 +274,7 @@ impl<'g, T> GridPoint<'g, T> {
 
         // bounds check and offset X
         if dx < 0 { // moving left
-            let dx = dx.abs() as usize;
+            let dx = dx.unsigned_abs();
             x = x.checked_sub(dx)?;
             index -= dx;
         } else { // moving right or not changing X
