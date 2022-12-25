@@ -132,7 +132,7 @@ impl<T> Grid<T> {
     /// # Panics
     /// Panics if the given row is not inside the grid.
     #[inline]
-    pub fn row_iter(&self, row: usize) -> impl Iterator<Item=&T> + DoubleEndedIterator {
+    pub fn row_iter(&self, row: usize) -> impl Iterator<Item=&T> + DoubleEndedIterator + ExactSizeIterator {
         assert!(row < self.height, "Attempted to access row outside the grid");
 
         let start_idx = row*self.width;
@@ -144,7 +144,7 @@ impl<T> Grid<T> {
     /// # Panics
     /// Panics if the given row is not inside the grid.
     #[inline]
-    pub fn row_iter_mut(&mut self, row: usize) -> impl Iterator<Item=&mut T> + DoubleEndedIterator {
+    pub fn row_iter_mut(&mut self, row: usize) -> impl Iterator<Item=&mut T> + DoubleEndedIterator + ExactSizeIterator {
         assert!(row < self.height, "Attempted to access row outside the grid");
 
         let start_idx = row*self.width;
@@ -156,7 +156,7 @@ impl<T> Grid<T> {
     /// # Panics
     /// Panics if the given column is not inside the grid.
     #[inline]
-    pub fn col_iter(&self, col: usize) -> impl Iterator<Item=&T> + DoubleEndedIterator {
+    pub fn col_iter(&self, col: usize) -> impl Iterator<Item=&T> + DoubleEndedIterator + ExactSizeIterator {
         assert!(col < self.width, "Attempted to access column outside the grid");
 
         let start_idx = col;
@@ -171,7 +171,7 @@ impl<T> Grid<T> {
     /// # Panics
     /// Panics if the given column is not inside the grid.
     #[inline]
-    pub fn col_iter_mut(&mut self, col: usize) -> impl Iterator<Item=&mut T> + DoubleEndedIterator {
+    pub fn col_iter_mut(&mut self, col: usize) -> impl Iterator<Item=&mut T> + DoubleEndedIterator + ExactSizeIterator {
         assert!(col < self.width, "Attempted to access column outside the grid");
 
         let start_idx = col;
@@ -202,6 +202,27 @@ impl<T: Copy> Grid<T> {
     /// Create a new grid, the same shape as another one, filled with a given value
     pub fn filled_like<U>(other: &Grid<U>, data: T) -> Self {
         Self::filled(other.width, other.height, data)
+    }
+
+    /// Pad the grid with a given value in every direction
+    ///
+    /// This will return a new grid that adds `n` copies of `value` to each side.
+    pub fn padded(&self, val: T, n: usize) -> Self {
+        let new_w = self.width + 2*n;
+        let new_h = self.height + 2*n;
+        let mut new_data = vec![val; new_w * new_h];
+        for y in 0..self.height {
+            let ny = y + n;
+            new_data[ny*new_w + n..ny*new_w + n + self.width]
+                .copy_from_slice(&self.data[y*self.width..(y+1)*self.width]);
+        }
+
+        Self { data: new_data, width: new_w, height: new_h }
+    }
+
+    /// Set every cell to a given value
+    pub fn fill(&mut self, data: T) {
+        self.data.fill(data);
     }
 }
 
@@ -253,7 +274,7 @@ impl<'g, T> GridPoint<'g, T> {
 
         // bounds check and offset X
         if dx < 0 { // moving left
-            let dx = (-dx) as usize;
+            let dx = dx.abs() as usize;
             x = x.checked_sub(dx)?;
             index -= dx;
         } else { // moving right or not changing X
@@ -269,14 +290,14 @@ impl<'g, T> GridPoint<'g, T> {
         if dy < 0 { // moving left
             let dy = (-dy) as usize;
             y = y.checked_sub(dy)?;
-            index -= self.grid.height * dy;
+            index -= self.grid.width * dy;
         } else { // moving right or not changing X
             let dy = dy as usize;
             y = y.checked_add(dy)?;
             if y >= self.grid.height {
                 return None;
             }
-            index += self.grid.height * dy;
+            index += self.grid.width * dy;
         }
 
         Some(Self { grid: self.grid, index, coords: (x, y) })
@@ -380,6 +401,13 @@ impl<'g, T> GridPoint<'g, T> {
             down: true,
             point: *self,
         }
+    }
+
+    /// Iterate over neighboring cells
+    pub fn neighbors<'a>(&'a self) -> impl Iterator<Item=GridPoint<'g, T>> + 'a {
+        [(-1,-1), (0, -1), (1, -1),
+         (-1,0),           (1, 0),
+         (-1,1),  (0, 1),  (1, 1)].into_iter().filter_map(|delta| self.offset(delta))
     }
 }
 
