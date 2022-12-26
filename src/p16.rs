@@ -179,7 +179,6 @@ fn solve1(input: &Input) -> Result<usize> {
 
     let apsp = all_pairs(valves);
     let (best, _states) = max_for_subset(input, &apsp, flow_mask, 30)?;
-    //println!("{}", states);
     Ok(best)
 }
 
@@ -223,7 +222,6 @@ fn solve2(input: &Input) -> Result<usize> {
                  us_score + them_score
              })
              .max().unwrap();
-    //println!("{}", states.into_inner());
     Ok(res)
 }
 
